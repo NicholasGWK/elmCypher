@@ -4,7 +4,7 @@ import Html.App as Html
 import Http
 import Task
 import Json.Decode exposing (Decoder, int, string, list, object2, (:=))
-
+import Soundcloud exposing (fetchEmbedCode, view)
 --- Model
 
 type Msg = FetchInitialUrls | InitialFetchSucceed (List Track) | FetchFail Http.Error
