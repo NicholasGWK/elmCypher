@@ -7,7 +7,7 @@ import Json.Decode exposing (Decoder, int, string, list, object2, (:=))
 
 --- Model
 
-type Msg = FetchUrls | FetchSucceed (List Track) | FetchFail Http.Error
+type Msg = FetchInitialUrls | InitialFetchSucceed (List Track) | FetchFail Http.Error
 
 firebaseUrl = "https://cypher-72923.firebaseio.com/tracks.json"
 
@@ -31,17 +31,21 @@ trackDecoder = object2 Track
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-      FetchUrls ->
-        (model, fetchUrls)
+      FetchInitialUrls ->
+        (model, fetchInitialUrls)
 
-      FetchSucceed urls ->
-        ( { previous = model.previous, current = model.current, next = urls } , Cmd.none)
+      InitialFetchSucceed urls ->
+            case urls of
+              first :: rest ->
+                  ( { previous = model.previous, current = first, next = rest}, Cmd.none)
+              _ ->
+                ( model, Cmd.none)
 
       FetchFail _ ->
         (model, Cmd.none)
 
-fetchUrls =
-  Task.perform FetchFail FetchSucceed (Http.get decodeTracks firebaseUrl )
+fetchInitialUrls =
+  Task.perform FetchFail InitialFetchSucceed (Http.get decodeTracks firebaseUrl )
 
 decodeTracks : Decoder (List Track)
 decodeTracks =
@@ -49,14 +53,14 @@ decodeTracks =
 -- View
 view : Model -> Html Msg
 view model =
-  div [] [text (toString model.next)]
+  div [] [text (toString model.current)]
 
 
 -- Init
 
 init : (Model, Cmd Msg)
 init =
-  ( { previous = [], current = { url = "", service = "" }, next = [] } , fetchUrls)
+  ( { previous = [], current = { url = "", service = "" }, next = [] } , fetchInitialUrls)
 
 -- Subs
 
