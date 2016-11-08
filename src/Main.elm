@@ -1,51 +1,85 @@
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Html.App as Html
 import Http
 import Task
-import Json.Decode exposing (Decoder, int, string, list, object2, (:=))
-import Soundcloud exposing (fetchEmbedCode, view)
+import Json.Decode exposing (Decoder, int, string, list, object3, maybe, (:=))
+import Soundcloud exposing (fetchEmbedCode, config)
 --- Model
 
-type Msg = FetchInitialUrls | InitialFetchSucceed (List Track) | FetchFail Http.Error
+type Msg =
+    FetchMoreTracksSucceed (List Track)
+  | FetchMoreTracksFail Http.Error
+  | NextTrack
+  | FetchSrcSucceed String
+  | FetchSrcFail Http.Error
+  | NoOp
+
 
 firebaseUrl = "https://cypher-72923.firebaseio.com/tracks.json"
 
 type alias Model =
-  { previous : List Track
+  { currentFetching : Bool
+  , previous : List Track
   , current : Track
   , next : List Track
   }
 type alias Track =
-  { url: String
-  , service: String
+  { url : String
+  , service : String
+  , src : Maybe String
   }
 
 trackDecoder : Decoder Track
-trackDecoder = object2 Track
+trackDecoder = object3 Track
                 ("url" := string)
                 ("type" := string)
+                (maybe ("src" := string))
 
 -- Update
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
+  let
+    noOp = (model, Cmd.none)
+  in
     case msg of
-      FetchInitialUrls ->
-        (model, fetchInitialUrls)
+      FetchMoreTracksSucceed urls ->
+            ({ model | next = model.next ++ urls }, Cmd.none)
+      FetchMoreTracksFail _ -> noOp
+      FetchSrcSucceed src ->
+        let
+          current = model.current
+          newCurrent = { current | src = Just src }
+        in
+          ( { model | current = newCurrent }, Cmd.none)
+      FetchSrcFail _ -> noOp
+      NoOp -> noOp
+      NextTrack ->
+        case model.next of
+          first :: rest ->
+            let
+              prev = model.previous ++ (current :: [])
+              current = first
+              next = rest
+            in
+              case current.src of
+                Just src ->
+                  (Model False prev current next, Cmd.none)
+                Nothing ->
+                  (Model True prev current next, fetchSrc current.url)
+          [] ->
+            (model, fetchMoreTracks)
 
-      InitialFetchSucceed urls ->
-            case urls of
-              first :: rest ->
-                  ( { previous = model.previous, current = first, next = rest}, Cmd.none)
-              _ ->
-                ( model, Cmd.none)
 
-      FetchFail _ ->
-        (model, Cmd.none)
+fetchMoreTracks : Cmd Msg
+fetchMoreTracks =
+  Task.perform FetchMoreTracksFail FetchMoreTracksSucceed (Http.get decodeTracks firebaseUrl )
 
-fetchInitialUrls =
-  Task.perform FetchFail InitialFetchSucceed (Http.get decodeTracks firebaseUrl )
+fetchSrc : String -> Cmd Msg
+fetchSrc url =
+  Task.perform FetchSrcFail FetchSrcSucceed (fetchEmbedCode url)
 
 decodeTracks : Decoder (List Track)
 decodeTracks =
@@ -53,14 +87,34 @@ decodeTracks =
 -- View
 view : Model -> Html Msg
 view model =
-  div [] [text (toString model.current)]
+  let
+    embed =
+      case model.current.src of
+        Just src ->
+          Soundcloud.view (Soundcloud.config { url = src })
+        Nothing ->
+          text (toString model.current)
+  in
+    div [] [ embed
+           , button [onClick NextTrack ] [text "Next"]
+           ]
 
 
 -- Init
 
+initModel =
+  { previous = []
+  , current = { url = ""
+              , service = ""
+              , src = Nothing
+              }
+  , next = []
+  , currentFetching = False
+  }
+
 init : (Model, Cmd Msg)
 init =
-  ( { previous = [], current = { url = "", service = "" }, next = [] } , fetchInitialUrls)
+  ( initModel , fetchMoreTracks)
 
 -- Subs
 

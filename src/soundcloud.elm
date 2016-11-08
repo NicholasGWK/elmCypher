@@ -1,4 +1,4 @@
-module Soundcloud exposing (fetchEmbedCode, view)
+module Soundcloud exposing (fetchEmbedCode, view, config)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -12,6 +12,10 @@ import Result exposing (..)
 
 oembedUrl = "http://soundcloud.com/oembed"
 
+type Config msg = Config { url : String }
+
+config : { url : String } -> Config msg
+config { url } = Config { url = url}
 fetchEmbedCode : String -> Task Error String
 fetchEmbedCode url =
   let
@@ -24,9 +28,9 @@ decodeEmbedData : Json.Decoder String
 decodeEmbedData =
   Json.customDecoder (Json.at ["html"] Json.string) getSrcFromOEmbed
 
-view : String -> Html Never
-view src =
-    div [] [ iframe [Html.Attributes.src src] [] ]
+view : Config msg -> Html msg
+view (Config { url }) =
+    div [] [ iframe [Html.Attributes.src url] [] ]
 
 getSrcFromOEmbed : String -> Result String String
 getSrcFromOEmbed str =
