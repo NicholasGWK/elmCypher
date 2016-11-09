@@ -5,7 +5,7 @@ import Html.App as Html
 import Http
 import Task
 import Json.Decode exposing (Decoder, int, string, list, object3, maybe, (:=))
-import Soundcloud exposing (fetchEmbedCode, config)
+import Soundcloud exposing (fetchEmbedCode)
 --- Model
 
 type Msg =
@@ -91,7 +91,7 @@ view model =
     embed =
       case model.current.src of
         Just src ->
-          Soundcloud.view (Soundcloud.config { url = src })
+          Soundcloud.view src
         Nothing ->
           text (toString model.current)
   in
